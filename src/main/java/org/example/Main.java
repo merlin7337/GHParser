@@ -1,26 +1,28 @@
 package org.example;
 
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
-
 import java.io.IOException;
+import java.util.Map;
 
 public class Main {
     public static void main(String[] args) {
+        String nickname = "torvalds";
         try {
-            Elements achievements = parseAchievements("torvalds");
-            for (Element e : achievements) {
-                System.out.println(e.text());
+            Map<String, String> userAchievements = Parser.parseUserAchievements(nickname);
+            Map<String, String> userInfo = Parser.parseUserInfo(nickname);
+            System.out.println("User " + nickname + " info:");
+            for (Map.Entry<String, String> entry : userInfo.entrySet()) {
+                String key = entry.getKey();
+                String value = entry.getValue();
+                System.out.println("    " + key + " : " + value);
+            }
+            System.out.println("User " + nickname + " achievements:");
+            for (Map.Entry<String, String> entry : userAchievements.entrySet()) {
+                String key = entry.getKey();
+                String value = entry.getValue();
+                System.out.println("    " + key + " : " + value);
             }
         } catch (IOException e) {
             System.out.println(e.getMessage());
         }
-    }
-
-    public static Elements parseAchievements(String nickname) throws IOException {
-        Document doc = Jsoup.connect("https://github.com/" + nickname + "?tab=achievements").get();
-        return doc.getElementsByClass("d-flex flex-justify-center mb-1");
     }
 }
