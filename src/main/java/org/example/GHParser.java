@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class Parser {
+public class GHParser {
     public static Map<String, String> parseUserAchievements(String nickname) throws IOException {
         Document doc = Jsoup.connect("https://github.com/" + nickname + "?tab=achievements").get();
         Map<String, String> userAchievements = new HashMap<>();
@@ -52,22 +52,15 @@ public class Parser {
                 .replace("k", "000");
         userInfo.put("following", following);
 
-        return userInfo;
-    }
-
-    public static Map<String, String> parseUserActivity(String nickname) throws IOException {
-        Document doc = Jsoup.connect("https://github.com/" + nickname).get();
-        Map<String, String> userActivity = new HashMap<>();
-
         String lastYearContributions = doc.select("h2[class=\"f4 text-normal mb-2\"]").text();
         Pattern pattern = Pattern.compile("\\d+.\\d+");
         Matcher matcher = pattern.matcher(lastYearContributions);
         while (matcher.find()) {
             lastYearContributions = lastYearContributions.substring(matcher.start(), matcher.end());
         }
-        userActivity.put("last year contributions", lastYearContributions.replace(",", "").trim());
+        userInfo.put("last year contributions", lastYearContributions.replace(",", ""));
 
-        return userActivity;
+        return userInfo;
     }
 
     public static List<Map<String, String>> parseUserPublicRepositories(String nickname) throws IOException {
@@ -76,23 +69,67 @@ public class Parser {
         List<Map<String, String>> repositoriesList = new ArrayList<>();
 
         for (Element e : repositories) {
-            repositoriesList.add(parseRepository(nickname, e.select("a[itemprop=\"name codeRepository\"]").text()));
+            repositoriesList.add(parseRepository(e));
         }
         return repositoriesList;
     }
 
-    public static Map<String, String> parseRepository(String nickname, String repoName) throws IOException {
-        String url = "https://github.com/" + nickname + "/" + repoName;
-        Document doc = Jsoup.connect(url).get();
+    private static Map<String, String> parseRepository(Element e) throws IOException {
         Map<String, String> repo = new HashMap<>();
-        repo.put("title", repoName);
+        String href = e.select("a[itemprop=\"name codeRepository\"]").attr("href");
+        String url = "https://github.com" + href;
+        Document doc = Jsoup.connect(url).get();
+
+        repo.put("title", e.select("a[itemprop=\"name codeRepository\"]").text());
+
+        repo.put("description", e.select("p[itemprop=\"description\"]").text());
+
         repo.put("URL", url);
-        repo.put("description", doc.select("p[class=\"f4 my-3\"]").text());
+
+        repo.put("main language", e.select("span[itemprop=\"programmingLanguage\"]").text());
+
+        try {
+            repo.put("stars", e.select("a[href=\"" + href + "/stargazers\"]").text()
+                    .replace(",", ""));
+        } catch (NullPointerException exception) {
+            repo.put("stars", "0");
+        }
+
+        try {
+            repo.put("forks", e.select("a[href=\"" + href + "/forks\"]").text()
+                    .replace(",", ""));
+        } catch (NullPointerException exception) {
+            repo.put("forks", "0");
+        }
+
+        try {
+            repo.put("license", e.select("svg[class=\"octicon octicon-law mr-1\"]")
+                    .parents()
+                    .first()
+                    .select("span[class=\"mr-3\"]")
+                    .text());
+        } catch (NullPointerException exception) {
+            repo.put("license", "");
+        }
+
+        repo.put("last edited", e.select("relative-time").text());
+
         repo.put("commits count", doc.select("li[class=\"ml-0 ml-md-3\"]").text()
                 .replace(" commits", "")
                 .replace(",", ""));
-        repo.put("last edited", doc.select("relative-time").text());
-        repo.put("last commit code", doc.select("a[class=\"f6 Link--secondary text-mono ml-2 d-none d-lg-inline\"]").text());
+
+        String watchersCount = doc.select("a[href=\"" + href + "/watchers\"]").text()
+                .replace(" watching", "");
+        watchersCount = watchersCount.contains(".")
+                ? watchersCount.replace(".", "").replace("k", "00")
+                : watchersCount.replace("k", "000");
+        repo.put("watchers count", watchersCount);
+
+        repo.put("branches count", doc.select("a[href=\"" + href + "/branches\"]").text()
+                .replace(" branches", "")
+                .replace(" branch", "")
+                .replace("View all ", ""));
+
         return repo;
     }
 }
